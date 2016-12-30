@@ -10,11 +10,13 @@ trait Stream[+A] {
     }
 
   def foldRight[B](z: => B)(f: (A, => B) => B): B = // The arrow `=>` in front of the argument type `B` means that the function `f` takes its second argument by name and may choose not to evaluate it.
+  {
+    println(s">>>${this.toList}.foldRight($z)($f)")
     this match {
-      case Cons(h,t) => f(h(), t().foldRight(z)(f)) // If `f` doesn't evaluate its second argument, the recursion never occurs.
+      case Cons(h, t) => f(h(), t().foldRight(z)(f)) // If `f` doesn't evaluate its second argument, the recursion never occurs.
       case _ => z
     }
-
+  }
   def exists(p: A => Boolean): Boolean = 
     foldRight(false)((a, b) => p(a) || b) // Here `b` is the unevaluated recursive step that folds the tail of the stream. If `p(a)` returns `true`, `b` will never be evaluated and the computation terminates early.
 
@@ -40,12 +42,16 @@ trait Stream[+A] {
       }
 
   def takeWhile(p: A => Boolean): Stream[A] =
-    this match {
-      case Cons(h, t) if p(h()) => cons(h(), t().takeWhile(p))
-      case _ => empty
-    }
+//    this match {
+//      case Cons(h, t) if p(h()) => cons(h(), t().takeWhile(p))
+//      case _ => empty
+//    }
+    foldRight(empty[A])((h,t) =>
+      if (p(h)) cons(h,t)
+      else      empty)
 
-  def forAll(p: A => Boolean): Boolean = sys.error("todo")
+  def forAll(p: A => Boolean): Boolean =
+    foldRight(true)((a, b) => p(a) && b)
 
   def headOption: Option[A] = sys.error("todo")
 
