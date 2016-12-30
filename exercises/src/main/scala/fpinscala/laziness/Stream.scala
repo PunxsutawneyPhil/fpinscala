@@ -52,7 +52,7 @@ trait Stream[+A] {
       else      empty)
 
   def forAll(p: A => Boolean): Boolean =
-    foldRight(true)((a, b) => p(a) && b)
+    foldRight(true)((a, b) => p(a) && b) 
 
   def headOption: Option[A] =
     foldRight(None: Option[A])((h, t) => Some(h))
