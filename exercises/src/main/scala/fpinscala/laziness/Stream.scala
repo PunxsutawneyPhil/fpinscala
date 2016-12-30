@@ -52,7 +52,7 @@ trait Stream[+A] {
       else      empty)
 
   def forAll(p: A => Boolean): Boolean =
-    foldRight(true)((a, b) => p(a) && b) 
+    foldRight(true)((a, b) => p(a) && b)
 
   def headOption: Option[A] =
     foldRight(None: Option[A])((h, t) => Some(h))
@@ -91,7 +91,24 @@ object Stream {
     else cons(as.head, apply(as.tail: _*))
 
   val ones: Stream[Int] = Stream.cons(1, ones)
-  def from(n: Int): Stream[Int] = sys.error("todo")
+
+  def constant[A](a: A): Stream[A] = {
+    lazy val tail: Stream[A] = Cons(() => a, () => tail)
+    tail
+  }
+
+  def from(n: Int): Stream[Int] = {
+//    lazy val stream: Stream[Int] = Cons(() => n, () => from(n+1))
+//    stream
+    cons(n, from(n+1))
+  }
+
+  def fibs(): Stream[Int] = {
+    def fibLoop(n1: Int, n2: Int): Stream[Int] = {
+      cons(n1, fibLoop(n2, n1 + n2))
+    }
+    fibLoop(0, 1)
+  }
 
   def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = sys.error("todo")
 }
