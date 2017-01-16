@@ -16,6 +16,15 @@ trait Stream[+A] {
       case _ => z
     }
   }
+
+  def scanRight[B](z: B)(f: (A, => B) => B): Stream[B] =
+    foldRight((z, Stream(z)))((a, p0) => {
+      // p0 is passed by-name and used in by-name args in f and cons. So use lazy val to ensure only one evaluation...
+      lazy val p1 = p0
+      val b2 = f(a, p1._1)
+      (b2, cons(b2, p1._2))
+    })._2
+
   def exists(p: A => Boolean): Boolean = 
     foldRight(false)((a, b) => p(a) || b) // Here `b` is the unevaluated recursive step that folds the tail of the stream. If `p(a)` returns `true`, `b` will never be evaluated and the computation terminates early.
 
@@ -33,9 +42,13 @@ trait Stream[+A] {
       }
 
   def takeViaUnfold(n: Int): Stream[A] =
-    unfold((n, this)){
-      case (0, _) | (_, Empty) => None
-      case (n, Cons(h, t)) => Option(h(), (n-1, t()))
+//    unfold((n, this)){
+//      case (0, _) | (_, Empty) => None
+//      case (n, Cons(h, t)) => Option(h(), (n-1, t()))
+    unfold((this,n)) {
+      case (Cons(h,t), 1) => Some((h(), (empty, 0)))
+      case (Cons(h,t), n) if n > 1 => Some((h(), (t(), n-1)))
+      case _ => None
     }
 
   def drop(n: Int): Stream[A] =
@@ -81,6 +94,20 @@ trait Stream[+A] {
       case Cons(h, t) => Option((f(h()), t()))
     }
 
+  def zipWith[B,C](b: Stream[B])(f: (A,B) => C): Stream[C] =
+    unfold((this, b)){
+      case (Cons(h1,t1), Cons(h2,t2)) => Option(f(h1(), h2()),(t1(), t2()))
+      case _ => None
+    }
+
+  def zipAll[B](s2: Stream[B]): Stream[(Option[A], Option[B])] =
+    unfold((this, s2)){
+      case (Cons(h1,t1), Cons(h2,t2)) => Option((Option(h1()), Option(h2())), (t1(), t2()))
+      case (Cons(h1,t1), _) => Option((Option(h1()), None), (t1(), empty))
+      case (_, Cons(h2,t2)) => Option((None, Option(h2())), (empty, t2()))
+      case _ => None
+    }
+
   def filter(f: A => Boolean): Stream[A] =
     foldRight(empty[A])((h, t) => if (f(h)) cons(h, t) else t )
 
@@ -90,7 +117,19 @@ trait Stream[+A] {
   def flatMap[B](f: A => Stream[B]): Stream[B] =
     foldRight(empty[B])((h, t) => f(h).append(t))
 
-  def startsWith[B](s: Stream[B]): Boolean = sys.error("todo")
+  def startsWith[B](s: Stream[B]): Boolean =
+    zipAll(s).takeWhile(!_._2.isEmpty) forAll {
+      case (h,h2) => h == h2
+    }
+
+  def tails: Stream[Stream[A]] =
+    cons(this, unfold(this){
+      case Cons(h,t) => Option(t(), t())
+      case Empty => None
+    })
+
+  def hasSubsequence[B >: A](sub: Stream[B]): Boolean =
+    tails.exists(_.startsWith(sub))
 }
 case object Empty extends Stream[Nothing]
 case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A]
